@@ -142,9 +142,9 @@ struct Triangle : public Intersectable {
         hit.normal = cross((r2 - r1), (r3 - r1));
         hit.t = dot((r1 - ray.start), hit.normal) / dot(ray.dir, hit.normal);
         hit.position = ray.start + ray.dir * hit.t;
-        if (dot(cross((r2 - r1), (hit.position - r1)), hit.normal) <= 0.0f) hit.t = -1.0f;
-        if (dot(cross((r3 - r2), (hit.position - r2)), hit.normal) <= 0.0f) hit.t = -1.0f;
-        if (dot(cross((r1 - r3), (hit.position - r3)), hit.normal) <= 0.0f) hit.t = -1.0f;
+        if (dot(cross((r2 - r1), (hit.position - r1)), hit.normal) < 0.0f) hit.t = -1.0f;
+        if (dot(cross((r3 - r2), (hit.position - r2)), hit.normal) < 0.0f) hit.t = -1.0f;
+        if (dot(cross((r1 - r3), (hit.position - r3)), hit.normal) < 0.0f) hit.t = -1.0f;
         return hit;
     }
 };
@@ -160,7 +160,18 @@ public:
 
         for (int i = 0; i < 15; i++)
             objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f));
-        objects.push_back(new Triangle(vec3(-0.5f, -0.5f, 0.5f), vec3(0.5f, -0.5f, 0.5f), vec3(0.0f, 0.5f, 0.0f)));
+
+        objects.push_back(new Triangle(vec3(-0.5f, -0.5f, -0.5f), vec3(0.5f, -0.5f, -0.5f), vec3(-0.5f, -0.5f, 0.5f)));
+        objects.push_back(new Triangle(vec3(-0.5f, -0.5f, 0.5f), vec3(0.5f, -0.5f, -0.5f), vec3(0.5f, -0.5f, 0.5f)));
+
+        objects.push_back(new Triangle(vec3(-0.5f, 0.5f, -0.5f), vec3(0.5f, 0.5f, -0.5f), vec3(-0.5f, 0.5f, 0.5f)));
+        objects.push_back(new Triangle(vec3(-0.5f, 0.5f, 0.5f), vec3(0.5f, 0.5f, -0.5f), vec3(0.5f, 0.5f, 0.5f)));
+
+        objects.push_back(new Triangle(vec3(-0.5f, 0.5f, -0.5f), vec3(-0.5f, -0.5f, -0.5f), vec3(-0.5f, 0.5f, 0.5f)));
+        objects.push_back(new Triangle(vec3(-0.5f, 0.5f, 0.5f), vec3(-0.5f, -0.5f, -0.5f), vec3(-0.5f, -0.5f, 0.5f)));
+
+        objects.push_back(new Triangle(vec3(-0.5f, 0.5f, -0.5f), vec3(-0.5f, -0.5f, -0.5f), vec3(0.5f, 0.5f, -0.5f)));
+        objects.push_back(new Triangle(vec3(0.5f, 0.5f, -0.5f), vec3(-0.5f, -0.5f, -0.5f), vec3(0.5f, -0.5f, -0.5f)));
     }
 
     void render(std::vector<vec4>& image) {
@@ -186,7 +197,7 @@ private:
     vec3 trace(Ray ray) {
         Hit hit = firstIntersect(ray);
         if (hit.t < 0) return La;
-        float c = 0.2f * (1.0f + dot(hit.normal, vup));
+        float c = 0.2f * (1.0f + dot(normalize(hit.normal), normalize(-ray.dir)));
         vec3 outRadiance = vec3(c, c, c);
         return outRadiance;
     }
@@ -226,9 +237,6 @@ Scene scene;
 FullScreenTexturedQuad * fullScreenTexturedQuad;
 
 void onInitialization() {
-    Triangle ta = Triangle(vec3(-5.0f, -5.0f, -5.0f), vec3(5.0f, -5.0f, -5.0f), vec3(0.0f, 5.0f, 0.0f));
-    ta.intersect(Ray(eye, lookat-eye));
-
     glViewport(0, 0, windowWidth, windowHeight);
     camera.set(eye, lookat, vup, fov);
     scene.build();
@@ -256,7 +264,7 @@ void onMouseMotion(int pX, int pY) {
 }
 
 long lastTime = 0;
-long fok = -45;
+long fok = -25;
 void onIdle() {
     long time = glutGet(GLUT_ELAPSED_TIME);
     if((time - lastTime) > 10) {
@@ -268,6 +276,6 @@ void onIdle() {
         scene.render(image);
         fullScreenTexturedQuad->setTexture(windowWidth, windowHeight, image);
         glutPostRedisplay();
-        //fok += 10;
+        fok -= 5;
     }
 }
