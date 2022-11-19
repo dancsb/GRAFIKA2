@@ -100,34 +100,6 @@ public:
     virtual Hit intersect(const Ray& ray) = 0;
 };
 
-struct Sphere : public Intersectable {
-    vec3 center;
-    float radius;
-
-    Sphere(const vec3& _center, float _radius) {
-        center = _center;
-        radius = _radius;
-    }
-
-    Hit intersect(const Ray& ray) {
-        Hit hit;
-        vec3 dist = ray.start - center;
-        float a = dot(ray.dir, ray.dir);
-        float b = dot(dist, ray.dir) * 2.0f;
-        float c = dot(dist, dist) - radius * radius;
-        float discr = b * b - 4.0f * a * c;
-        if (discr < 0) return hit;
-        float sqrt_discr = sqrtf(discr);
-        float t1 = (-b + sqrt_discr) / 2.0f / a;	// t1 >= t2 for sure
-        float t2 = (-b - sqrt_discr) / 2.0f / a;
-        if (t1 <= 0) return hit;
-        hit.t = (t2 > 0) ? t2 : t1;
-        hit.position = ray.start + ray.dir * hit.t;
-        hit.normal = (hit.position - center) * (1.0f / radius);
-        return hit;
-    }
-};
-
 struct Triangle : public Intersectable {
     vec3 r1, r2 ,r3;
 
@@ -149,18 +121,10 @@ struct Triangle : public Intersectable {
     }
 };
 
-float rnd() { return (float)rand() / RAND_MAX; }
-
 class Scene {
     std::vector<Intersectable *> objects;
     vec3 La;
-public:
-    void build() {
-        La = vec3(0.0f, 0.0f, 0.0f);
-
-        for (int i = 0; i < 15; i++)
-            objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f));
-
+    void buildRoom() {
         objects.push_back(new Triangle(vec3(-0.5f, -0.5f, -0.5f), vec3(0.5f, -0.5f, -0.5f), vec3(-0.5f, -0.5f, 0.5f)));
         objects.push_back(new Triangle(vec3(-0.5f, -0.5f, 0.5f), vec3(0.5f, -0.5f, -0.5f), vec3(0.5f, -0.5f, 0.5f)));
 
@@ -172,6 +136,129 @@ public:
 
         objects.push_back(new Triangle(vec3(-0.5f, 0.5f, -0.5f), vec3(-0.5f, -0.5f, -0.5f), vec3(0.5f, 0.5f, -0.5f)));
         objects.push_back(new Triangle(vec3(0.5f, 0.5f, -0.5f), vec3(-0.5f, -0.5f, -0.5f), vec3(0.5f, -0.5f, -0.5f)));
+
+        objects.push_back(new Triangle(vec3(0.5f, 0.5f, -0.5f), vec3(0.5f, -0.5f, -0.5f), vec3(0.5f, 0.5f, 0.5f)));
+        objects.push_back(new Triangle(vec3(0.5f, 0.5f, 0.5f), vec3(0.5f, -0.5f, -0.5f), vec3(0.5f, -0.5f, 0.5f)));
+
+        objects.push_back(new Triangle(vec3(0.5f, 0.5f, 0.5f), vec3(0.5f, -0.5f, 0.5f), vec3(-0.5f, 0.5f, 0.5f)));
+        objects.push_back(new Triangle(vec3(-0.5f, 0.5f, 0.5f), vec3(0.5f, -0.5f, 0.5f), vec3(-0.5f, -0.5f, 0.5f)));
+    }
+    void buildIcosahedron() {
+        float scale = 0.2f;
+        float a = 0.525731f * scale;
+        float b = 0.850651f * scale;
+        vec3 offset(0.25f, -0.5f + b, -0.25f);
+
+        std::vector<vec3> vertices;
+
+        vertices.push_back(vec3(0, -a, b) + offset);
+        vertices.push_back(vec3(b, 0, a) + offset);
+        vertices.push_back(vec3(b, 0, -a) + offset);
+        vertices.push_back(vec3(-b, 0, -a) + offset);
+        vertices.push_back(vec3(-b, 0, a) + offset);
+        vertices.push_back(vec3(-a, b, 0) + offset);
+        vertices.push_back(vec3(a, b, 0) + offset);
+        vertices.push_back(vec3(a, -b, 0) + offset);
+        vertices.push_back(vec3(-a, -b, 0) + offset);
+        vertices.push_back(vec3(0, -a, -b) + offset);
+        vertices.push_back(vec3(0, a, -b) + offset);
+        vertices.push_back(vec3(0, a, b) + offset);
+
+        objects.push_back(new Triangle(vertices[1], vertices[2], vertices[6]));
+        objects.push_back(new Triangle(vertices[1], vertices[7], vertices[2]));
+        objects.push_back(new Triangle(vertices[3], vertices[4], vertices[5]));
+        objects.push_back(new Triangle(vertices[4], vertices[3], vertices[8]));
+        objects.push_back(new Triangle(vertices[6], vertices[5], vertices[11]));
+        objects.push_back(new Triangle(vertices[5], vertices[6], vertices[10]));
+        objects.push_back(new Triangle(vertices[9], vertices[10], vertices[2]));
+        objects.push_back(new Triangle(vertices[10], vertices[9], vertices[3]));
+        objects.push_back(new Triangle(vertices[7], vertices[8], vertices[9]));
+        objects.push_back(new Triangle(vertices[8], vertices[7], vertices[0]));
+        objects.push_back(new Triangle(vertices[11], vertices[0], vertices[1]));
+        objects.push_back(new Triangle(vertices[0], vertices[11], vertices[4]));
+        objects.push_back(new Triangle(vertices[6], vertices[2], vertices[10]));
+        objects.push_back(new Triangle(vertices[1], vertices[6], vertices[11]));
+        objects.push_back(new Triangle(vertices[3], vertices[5], vertices[10]));
+        objects.push_back(new Triangle(vertices[5], vertices[4], vertices[11]));
+        objects.push_back(new Triangle(vertices[2], vertices[7], vertices[9]));
+        objects.push_back(new Triangle(vertices[7], vertices[1], vertices[0]));
+        objects.push_back(new Triangle(vertices[3], vertices[9], vertices[8]));
+        objects.push_back(new Triangle(vertices[4], vertices[8], vertices[0]));
+    }
+    void buildDodecahedron() {
+        float scale = 0.25f;
+        float a = 0.356822f * scale;
+        float b = 0.57735f * scale;
+        float c = 0.934172f * scale;
+        vec3 offset(-0.15f, -0.5f + c, 0.15f);
+
+        std::vector<vec3> vertices;
+
+        vertices.push_back(vec3(-b, -b, b) + offset);
+        vertices.push_back(vec3(c, a, 0) + offset);
+        vertices.push_back(vec3(c, -a, 0) + offset);
+        vertices.push_back(vec3(-c, a, 0) + offset);
+        vertices.push_back(vec3(-c, -a, 0) + offset);
+        vertices.push_back(vec3(0, c, a) + offset);
+        vertices.push_back(vec3(0, c, -a) + offset);
+        vertices.push_back(vec3(a, 0, -c) + offset);
+        vertices.push_back(vec3(-a, 0, -c) + offset);
+        vertices.push_back(vec3(0, -c, -a) + offset);
+        vertices.push_back(vec3(0, -c, a) + offset);
+        vertices.push_back(vec3(a, 0, c) + offset);
+        vertices.push_back(vec3(-a, 0, c) + offset);
+        vertices.push_back(vec3(b, b, -b) + offset);
+        vertices.push_back(vec3(b, b, b) + offset);
+        vertices.push_back(vec3(-b, b, -b) + offset);
+        vertices.push_back(vec3(-b, b, b) + offset);
+        vertices.push_back(vec3(b, -b, -b) + offset);
+        vertices.push_back(vec3(b, -b, b) + offset);
+        vertices.push_back(vec3(-b, -b, -b) + offset);
+
+        objects.push_back(new Triangle(vertices[18], vertices[2], vertices[1]));
+        objects.push_back(new Triangle(vertices[11], vertices[18], vertices[1]));
+        objects.push_back(new Triangle(vertices[14], vertices[11], vertices[1]));
+        objects.push_back(new Triangle(vertices[7], vertices[13], vertices[1]));
+        objects.push_back(new Triangle(vertices[17], vertices[7], vertices[1]));
+        objects.push_back(new Triangle(vertices[2], vertices[17], vertices[1]));
+        objects.push_back(new Triangle(vertices[19], vertices[4], vertices[3]));
+        objects.push_back(new Triangle(vertices[8], vertices[19], vertices[3]));
+        objects.push_back(new Triangle(vertices[15], vertices[8], vertices[3]));
+        objects.push_back(new Triangle(vertices[12], vertices[16], vertices[3]));
+        objects.push_back(new Triangle(vertices[0], vertices[12], vertices[3]));
+        objects.push_back(new Triangle(vertices[4], vertices[0], vertices[3]));
+        objects.push_back(new Triangle(vertices[6], vertices[15], vertices[3]));
+        objects.push_back(new Triangle(vertices[5], vertices[6], vertices[3]));
+        objects.push_back(new Triangle(vertices[16], vertices[5], vertices[3]));
+        objects.push_back(new Triangle(vertices[5], vertices[14], vertices[1]));
+        objects.push_back(new Triangle(vertices[6], vertices[5], vertices[1]));
+        objects.push_back(new Triangle(vertices[13], vertices[6], vertices[1]));
+        objects.push_back(new Triangle(vertices[9], vertices[17], vertices[2]));
+        objects.push_back(new Triangle(vertices[10], vertices[9], vertices[2]));
+        objects.push_back(new Triangle(vertices[18], vertices[10], vertices[2]));
+        objects.push_back(new Triangle(vertices[10], vertices[0], vertices[4]));
+        objects.push_back(new Triangle(vertices[9], vertices[10], vertices[4]));
+        objects.push_back(new Triangle(vertices[19], vertices[9], vertices[4]));
+        objects.push_back(new Triangle(vertices[19], vertices[8], vertices[7]));
+        objects.push_back(new Triangle(vertices[9], vertices[19], vertices[7]));
+        objects.push_back(new Triangle(vertices[17], vertices[9], vertices[7]));
+        objects.push_back(new Triangle(vertices[8], vertices[15], vertices[6]));
+        objects.push_back(new Triangle(vertices[7], vertices[8], vertices[6]));
+        objects.push_back(new Triangle(vertices[13], vertices[7], vertices[6]));
+        objects.push_back(new Triangle(vertices[11], vertices[14], vertices[5]));
+        objects.push_back(new Triangle(vertices[12], vertices[11], vertices[5]));
+        objects.push_back(new Triangle(vertices[16], vertices[12], vertices[5]));
+        objects.push_back(new Triangle(vertices[12], vertices[0], vertices[10]));
+        objects.push_back(new Triangle(vertices[11], vertices[12], vertices[10]));
+        objects.push_back(new Triangle(vertices[18], vertices[11], vertices[10]));
+    }
+public:
+    void build() {
+        La = vec3(0.0f, 0.0f, 0.0f);
+
+        buildRoom();
+        buildIcosahedron();
+        buildDodecahedron();
     }
 
     void render(std::vector<vec4>& image) {
@@ -185,11 +272,17 @@ public:
     }
 private:
     Hit firstIntersect(Ray ray) {
-        Hit bestHit;
+        Hit bestHit, secBestHit;
         for (Intersectable * object : objects) {
             Hit hit = object->intersect(ray);
-            if (hit.t > 0 && (bestHit.t < 0 || hit.t < bestHit.t))  bestHit = hit;
+            if (hit.t > 0 && (bestHit.t < 0 || hit.t < bestHit.t)) {
+                secBestHit = bestHit;
+                bestHit = hit;
+            }
+            if(hit.t > bestHit.t && (secBestHit.t < 0 || hit.t < secBestHit.t))
+                secBestHit = hit;
         }
+        if (secBestHit.t > 0) bestHit = secBestHit;
         if (dot(ray.dir, bestHit.normal) > 0) bestHit.normal = bestHit.normal * (-1);
         return bestHit;
     }
@@ -263,19 +356,14 @@ void onMouse(int button, int state, int pX, int pY) {
 void onMouseMotion(int pX, int pY) {
 }
 
-long lastTime = 0;
-long fok = -25;
+long angle = 0;
 void onIdle() {
-    long time = glutGet(GLUT_ELAPSED_TIME);
-    if((time - lastTime) > 10) {
-        lastTime = time;
-        eye.x = cosf((fok + 90) / 180.0f * M_PI) * 2.0f;
-        eye.z = sinf((fok + 90) / 180.0f * M_PI) * 2.0f;
-        camera.set(eye, lookat, vup, fov);
-        std::vector<vec4> image(windowWidth * windowHeight);
-        scene.render(image);
-        fullScreenTexturedQuad->setTexture(windowWidth, windowHeight, image);
-        glutPostRedisplay();
-        fok -= 5;
-    }
+    angle -= 5;
+    eye.x = cosf((angle + 90) / 180.0f * M_PI) * 2.0f;
+    eye.z = sinf((angle + 90) / 180.0f * M_PI) * 2.0f;
+    camera.set(eye, lookat, vup, fov);
+    std::vector<vec4> image(windowWidth * windowHeight);
+    scene.render(image);
+    fullScreenTexturedQuad->setTexture(windowWidth, windowHeight, image);
+    glutPostRedisplay();
 }
