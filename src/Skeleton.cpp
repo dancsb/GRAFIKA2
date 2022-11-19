@@ -89,13 +89,15 @@ public:
 
     Ray getRay(int X, int Y) {
         vec3 dir = lookat + right * (2.0f * (X + 0.5f) / windowWidth - 1) + up * (2.0f * (Y + 0.5f) / windowHeight - 1) - eye;
-        return Ray(eye, dir);
+        return {eye, dir};
     }
 };
 
 Camera camera;
 
 class Intersectable {
+protected:
+    int color = 0;
 public:
     virtual Hit intersect(const Ray& ray) = 0;
 };
@@ -103,13 +105,9 @@ public:
 struct Triangle : public Intersectable {
     vec3 r1, r2 ,r3;
 
-    Triangle(const vec3& r1, const vec3& r2, const vec3& r3) {
-        this->r1 = r1;
-        this->r2 = r2;
-        this->r3 = r3;
-    }
+    Triangle(const vec3& r1, const vec3& r2, const vec3& r3) : r1(r1), r2(r2), r3(r3) {}
 
-    Hit intersect(const Ray& ray) {
+    Hit intersect(const Ray& ray) override {
         Hit hit;
         hit.normal = cross((r2 - r1), (r3 - r1));
         hit.t = dot((r1 - ray.start), hit.normal) / dot(ray.dir, hit.normal);
@@ -117,6 +115,39 @@ struct Triangle : public Intersectable {
         if (dot(cross((r2 - r1), (hit.position - r1)), hit.normal) < 0.0f) hit.t = -1.0f;
         if (dot(cross((r3 - r2), (hit.position - r2)), hit.normal) < 0.0f) hit.t = -1.0f;
         if (dot(cross((r1 - r3), (hit.position - r3)), hit.normal) < 0.0f) hit.t = -1.0f;
+        return hit;
+    }
+};
+
+struct Cone : public Intersectable {
+    vec3 p, n;
+    float h, alpha;
+
+    Cone(const vec3 &p, const vec3 &n, float h, float alpha, int color) : p(p), n(n), h(h), alpha(alpha) {
+        this->color = color;
+    }
+
+    Hit intersect(const Ray& ray) override {
+        Hit hit;
+        vec3 dist = ray.start - p;
+        float a = powf(dot(n, ray.dir), 2.0f) - powf(cosf(alpha), 2.0f);
+        float b = ((dot(n, ray.dir) * dot(dist, n)) - dot(dist, ray.dir) * powf(cosf(alpha), 2.0f)) * 2.0f;
+        float c = powf(dot(dist, n), 2.0f) - dot(dist, dist) * powf(cosf(alpha), 2.0f);
+        float discr = b * b - 4.0f * a * c;
+        if (discr < 0) return hit;
+        float sqrt_discr = sqrtf(discr);
+        float t1 = (-b + sqrt_discr) / 2.0f / a;
+        float t2 = (-b - sqrt_discr) / 2.0f / a;
+        vec3 hitpos1 = ray.start + ray.dir * t1;
+        vec3 hitpos2 = ray.start + ray.dir * t2;
+        if (dot(hitpos1 - p, n) < 0.0f || dot(hitpos1 - p, n) > h) t1 = -1.0f;
+        if (dot(hitpos2 - p, n) < 0.0f || dot(hitpos2 - p, n) > h) t2 = -1.0f;
+
+        if (t1 >= 0.0f && t2 < 0.0f) hit.t = t1;
+        else if (t1 < 0.0f && t2 >= 0.0f) hit.t = t2;
+        else hit.t = (t1 < t2) ? t1 : t2;
+        hit.position = ray.start + ray.dir * hit.t;
+        hit.normal =normalize(2.0f * (dot(hit.position - p, n)) * n - 2.0f * (hit.position - p) * powf(cosf(alpha), 2.0f));
         return hit;
     }
 };
@@ -259,6 +290,8 @@ public:
         buildRoom();
         buildIcosahedron();
         buildDodecahedron();
+
+        objects.push_back(new Cone(vec3(0, 0.5f, 0), vec3(0, -1, 0), 0.2f, 20.0f / 180.0f * M_PI, 1));
     }
 
     void render(std::vector<vec4>& image) {
@@ -356,11 +389,12 @@ void onMouse(int button, int state, int pX, int pY) {
 void onMouseMotion(int pX, int pY) {
 }
 
-long angle = 0;
+int angle = 0;
 void onIdle() {
     angle -= 5;
-    eye.x = cosf((angle + 90) / 180.0f * M_PI) * 2.0f;
-    eye.z = sinf((angle + 90) / 180.0f * M_PI) * 2.0f;
+    if (angle < -360) angle += 360;
+    eye.x = cosf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f;
+    eye.z = sinf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f;
     camera.set(eye, lookat, vup, fov);
     std::vector<vec4> image(windowWidth * windowHeight);
     scene.render(image);
