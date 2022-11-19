@@ -33,8 +33,9 @@
 //=============================================================================================
 #include "framework.h"
 
-float fov = 45 * M_PI / 180;
-vec3 eye = vec3(0, 0, 2), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
+float fov = 45.0f / 180.0f * M_PI;
+int angle = -25;
+vec3 eye = vec3(cosf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f, 0, sinf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 
 GPUProgram gpuProgram;
 
@@ -100,6 +101,7 @@ protected:
     int color = 0;
 public:
     virtual Hit intersect(const Ray& ray) = 0;
+    virtual Ray getRay() {};
 };
 
 struct Triangle : public Intersectable {
@@ -134,7 +136,7 @@ struct Cone : public Intersectable {
         float b = ((dot(n, ray.dir) * dot(dist, n)) - dot(dist, ray.dir) * powf(cosf(alpha), 2.0f)) * 2.0f;
         float c = powf(dot(dist, n), 2.0f) - dot(dist, dist) * powf(cosf(alpha), 2.0f);
         float discr = b * b - 4.0f * a * c;
-        if (discr < 0) return hit;
+        if (discr < 0.0f) return hit;
         float sqrt_discr = sqrtf(discr);
         float t1 = (-b + sqrt_discr) / 2.0f / a;
         float t2 = (-b - sqrt_discr) / 2.0f / a;
@@ -142,13 +144,16 @@ struct Cone : public Intersectable {
         vec3 hitpos2 = ray.start + ray.dir * t2;
         if (dot(hitpos1 - p, n) < 0.0f || dot(hitpos1 - p, n) > h) t1 = -1.0f;
         if (dot(hitpos2 - p, n) < 0.0f || dot(hitpos2 - p, n) > h) t2 = -1.0f;
-
         if (t1 >= 0.0f && t2 < 0.0f) hit.t = t1;
         else if (t1 < 0.0f && t2 >= 0.0f) hit.t = t2;
         else hit.t = (t1 < t2) ? t1 : t2;
         hit.position = ray.start + ray.dir * hit.t;
         hit.normal =normalize(2.0f * (dot(hit.position - p, n)) * n - 2.0f * (hit.position - p) * powf(cosf(alpha), 2.0f));
         return hit;
+    }
+
+    Ray getRay() override {
+        return {p, n};
     }
 };
 
@@ -291,7 +296,9 @@ public:
         buildIcosahedron();
         buildDodecahedron();
 
-        objects.push_back(new Cone(vec3(0, 0.5f, 0), vec3(0, -1, 0), 0.2f, 20.0f / 180.0f * M_PI, 1));
+        objects.push_back(new Cone(vec3(0.0f, 0.5f, 0.0f), vec3(0, -1, 0), 0.2f, 20.0f / 180.0f * M_PI, 1));
+        objects.push_back(new Cone(vec3(0.3f, 0.4f, -0.5f), vec3(0, 0, 1), 0.2f, 20.0f / 180.0f * M_PI, 2));
+        objects.push_back(new Cone(vec3(-0.5f, 0.0f, 0.0f), vec3(1, 0, 0), 0.2f, 20.0f / 180.0f * M_PI, 3));
     }
 
     void render(std::vector<vec4>& image) {
@@ -389,7 +396,6 @@ void onMouse(int button, int state, int pX, int pY) {
 void onMouseMotion(int pX, int pY) {
 }
 
-int angle = 0;
 void onIdle() {
     angle -= 5;
     if (angle < -360) angle += 360;
