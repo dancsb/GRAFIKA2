@@ -34,7 +34,7 @@
 #include "framework.h"
 
 float fov = 45.0f / 180.0f * M_PI;
-int angle = -205;
+int angle = 1;
 
 GPUProgram gpuProgram;
 
@@ -416,6 +416,53 @@ void onInitialization() {
     gpuProgram.create(vertexSource, fragmentSource, "fragmentColor");
 }
 
+std::vector<vec4> image(windowWidth * windowHeight);
+int count = 0;
+
+void xdMoment() {
+    byte* Buff = new byte[windowWidth*windowWidth*3];
+
+    for (long i = 0; i < image.size(); i++) {
+        Buff[i * 3 + 0] = image[i].z >= 1.0f ? 255 : (byte)(image[i].z * 255.0f);
+        Buff[i * 3 + 1] = image[i].y >= 1.0f ? 255 : (byte)(image[i].y * 255.0f);
+        Buff[i * 3 + 2] = image[i].x >= 1.0f ? 255 : (byte)(image[i].x * 255.0f);
+    }
+
+    char fn[100+1];
+    snprintf(fn, 100, "bmps/%d.bmp", count);
+
+    FILE *Out = fopen(fn, "wb");
+    if (!Out)
+        return;
+    BITMAPFILEHEADER bitmapFileHeader;
+    BITMAPINFOHEADER bitmapInfoHeader;
+
+    bitmapFileHeader.bfType = 0x4D42;
+    bitmapFileHeader.bfSize = windowWidth*windowHeight * 3;
+    bitmapFileHeader.bfReserved1 = 0;
+    bitmapFileHeader.bfReserved2 = 0;
+    bitmapFileHeader.bfOffBits =
+            sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+
+    bitmapInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmapInfoHeader.biWidth = windowWidth;
+    bitmapInfoHeader.biHeight = windowHeight;
+    bitmapInfoHeader.biPlanes = 1;
+    bitmapInfoHeader.biBitCount = 24;
+    bitmapInfoHeader.biCompression = BI_RGB;
+    bitmapInfoHeader.biSizeImage = 0;
+    bitmapInfoHeader.biXPelsPerMeter = 0;
+    bitmapInfoHeader.biYPelsPerMeter = 0;
+    bitmapInfoHeader.biClrUsed = 0;
+    bitmapInfoHeader.biClrImportant = 0;
+
+    fwrite(&bitmapFileHeader, sizeof(BITMAPFILEHEADER), 1, Out);
+    fwrite(&bitmapInfoHeader, sizeof(BITMAPINFOHEADER), 1, Out);
+    fwrite(Buff, windowWidth*windowHeight * 3, 1, Out);
+    fclose(Out);
+    if (count == 360) std::exit(0);
+}
+
 void onDisplay() {
     fullScreenTexturedQuad->Draw();
     glutSwapBuffers();
@@ -434,11 +481,12 @@ void onMouseMotion(int pX, int pY) {
 }
 
 void onIdle() {
-    angle -= 5;
+    angle -= 1;
+    count++;
     if (angle < -360) angle += 360;
     camera.set();
-    std::vector<vec4> image(windowWidth * windowHeight);
     scene.render(image);
     fullScreenTexturedQuad->setTexture(windowWidth, windowHeight, image);
     glutPostRedisplay();
+    xdMoment();
 }
