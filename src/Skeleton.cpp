@@ -35,7 +35,6 @@
 
 float fov = 45.0f / 180.0f * M_PI;
 int angle = -205;
-vec3 eye = vec3(cosf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f, 0, sinf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 
 GPUProgram gpuProgram;
 
@@ -79,12 +78,16 @@ struct Hit {
 class Camera {
     vec3 eye, lookat, right, up;
 public:
-    void set(vec3 _eye, vec3 _lookat, vec3 vup, float fov) {
-        eye = _eye;
-        lookat = _lookat;
+    Camera() {
+        set();
+    }
+
+    void set() {
+        eye = vec3(cosf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f, 0, sinf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f);
+        lookat = vec3(0, 0, 0);
         vec3 w = eye - lookat;
         float focus = length(w);
-        right = normalize(cross(vup, w)) * focus * tanf(fov / 2);
+        right = normalize(cross(vec3(0, 1, 0), w)) * focus * tanf(fov / 2);
         up = normalize(cross(w, right)) * focus * tanf(fov / 2);
     }
 
@@ -96,12 +99,21 @@ public:
 
 Camera camera;
 
+struct cone_data {
+    vec3 p, n;
+    float h, alpha;
+    int id;
+
+    cone_data(const vec3 &p, const vec3 &n, float h, float alpha, int id) : p(p), n(n), h(h), alpha(alpha), id(id) {}
+};
+
+std::vector<cone_data> cones;
+
 class Intersectable {
 protected:
     int color = 0;
 public:
     virtual Hit intersect(const Ray& ray) = 0;
-    virtual Ray getRay() {};
 };
 
 struct Triangle : public Intersectable {
@@ -150,10 +162,6 @@ struct Cone : public Intersectable {
         hit.position = ray.start + ray.dir * hit.t;
         hit.normal =normalize(2.0f * (dot(hit.position - p, n)) * n - 2.0f * (hit.position - p) * powf(cosf(alpha), 2.0f));
         return hit;
-    }
-
-    Ray getRay() override {
-        return {p, n};
     }
 };
 
@@ -296,9 +304,9 @@ public:
         buildIcosahedron();
         buildDodecahedron();
 
-        objects.push_back(new Cone(vec3(0.0f, 0.5f, 0.0f), vec3(0, -1, 0), 0.2f, 20.0f / 180.0f * M_PI, 1));
-        objects.push_back(new Cone(vec3(0.3f, 0.4f, -0.5f), vec3(0, 0, 1), 0.2f, 20.0f / 180.0f * M_PI, 2));
-        objects.push_back(new Cone(vec3(-0.5f, 0.0f, 0.0f), vec3(1, 0, 0), 0.2f, 20.0f / 180.0f * M_PI, 3));
+        objects.push_back(new Cone(cones[0].p, cones[0].n, cones[0].h, cones[0].alpha, cones[0].id));
+        objects.push_back(new Cone(cones[1].p, cones[1].n, cones[1].h, cones[1].alpha, cones[1].id));
+        objects.push_back(new Cone(cones[2].p, cones[2].n, cones[2].h, cones[2].alpha, cones[2].id));
     }
 
     void render(std::vector<vec4>& image) {
@@ -341,9 +349,8 @@ private:
 
     bool shadowIntersect(Ray ray, int id) {
         Hit hit = firstIntersectP(ray);
-        if (id == 1 && hit.t > 0 && length(hit.position - ray.start) + 0.001f < length(vec3(0.0f, 0.5f, 0.0f) - ray.start)) return true;
-        if (id == 2 && hit.t > 0 && length(hit.position - ray.start) + 0.001f < length(vec3(0.3f, 0.4f, -0.5f) - ray.start)) return true;
-        if (id == 3 && hit.t > 0 && length(hit.position - ray.start) + 0.001f < length(vec3(-0.5f, 0.0f, 0.0f) - ray.start)) return true;
+        for (int i = 0; i < 3; i++)
+            if (id == i + 1 && hit.t > 0 && length(hit.position - cones[i].p) > 0.002f) return true;
         return false;
     }
 
@@ -352,14 +359,13 @@ private:
         if (hit.t < 0) return La;
         float c = 0.2f * (1.0f + dot(normalize(hit.normal), normalize(-ray.dir)));
         vec3 outRadiance = vec3(c, c, c);
-        if (!shadowIntersect(Ray(hit.position + hit.normal * 0.0002f, normalize(vec3(0.0f, 0.5f, 0.0f) + vec3(0, -1, 0) * 0.002f - hit.position)), 1))
-            outRadiance.x += 0.2f;
+        float rgb[3] = { 0 };
 
-        if (!shadowIntersect(Ray(hit.position + hit.normal * 0.0002f, normalize(vec3(0.3f, 0.4f, -0.5f) + vec3(0, 0, 1) * 0.002f - hit.position)), 2))
-            outRadiance.y += 0.2f;
+        for (int i = 0; i < 3; i++)
+            if (!shadowIntersect(Ray(hit.position + hit.normal * 0.0002f, normalize(cones[i].p + cones[i].n * 0.002f - hit.position)), cones[i].id))
+                rgb[i] = c / length(hit.position - cones[i].p);
 
-        if (!shadowIntersect(Ray(hit.position + hit.normal * 0.0002f, normalize(vec3(-0.5f, 0.0f, 0.0f) + vec3(1, 0, 0) * 0.002f - hit.position)), 3))
-            outRadiance.z += 0.2f;
+        outRadiance = outRadiance + vec3(rgb[0], rgb[1], rgb[2]);
         return outRadiance;
     }
 };
@@ -398,8 +404,11 @@ Scene scene;
 FullScreenTexturedQuad * fullScreenTexturedQuad;
 
 void onInitialization() {
+    cones.push_back(cone_data(vec3(0.0f, 0.5f, 0.0f), vec3(0, -1, 0), 0.2f, 20.0f / 180.0f * M_PI, 1));
+    cones.push_back(cone_data(vec3(0.3f, 0.1f, -0.5f), vec3(0, 0, 1), 0.2f, 20.0f / 180.0f * M_PI, 2));
+    cones.push_back(cone_data(vec3(-0.5f, 0.0f, 0.0f), vec3(1, 0, 0), 0.2f, 20.0f / 180.0f * M_PI, 3));
+
     glViewport(0, 0, windowWidth, windowHeight);
-    camera.set(eye, lookat, vup, fov);
     scene.build();
     std::vector<vec4> image(windowWidth * windowHeight);
     scene.render(image);
@@ -427,9 +436,7 @@ void onMouseMotion(int pX, int pY) {
 void onIdle() {
     angle -= 5;
     if (angle < -360) angle += 360;
-    eye.x = cosf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f;
-    eye.z = sinf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f;
-    camera.set(eye, lookat, vup, fov);
+    camera.set();
     std::vector<vec4> image(windowWidth * windowHeight);
     scene.render(image);
     fullScreenTexturedQuad->setTexture(windowWidth, windowHeight, image);
