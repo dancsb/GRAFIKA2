@@ -34,7 +34,7 @@
 #include "framework.h"
 
 float fov = 45.0f / 180.0f * M_PI;
-int angle = -25;
+int angle = -205;
 vec3 eye = vec3(cosf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f, 0, sinf((float)(((float)angle + 90.0f) / 180.0f * M_PI)) * 2.0f), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 
 GPUProgram gpuProgram;
@@ -43,12 +43,12 @@ const char *vertexSource = R"(
 	#version 330
     precision highp float;
 
-	layout(location = 0) in vec2 cVertexPosition;	// Attrib Array 0
+	layout(location = 0) in vec2 cVertexPosition;
 	out vec2 texcoord;
 
 	void main() {
-		texcoord = (cVertexPosition + vec2(1, 1))/2;							// -1,1 to 0,1
-		gl_Position = vec4(cVertexPosition.x, cVertexPosition.y, 0, 1); 		// transform to clipping space
+		texcoord = (cVertexPosition + vec2(1, 1))/2;
+		gl_Position = vec4(cVertexPosition.x, cVertexPosition.y, 0, 1);
 	}
 )";
 
@@ -57,8 +57,8 @@ const char *fragmentSource = R"(
     precision highp float;
 
 	uniform sampler2D textureUnit;
-	in  vec2 texcoord;			// interpolated texture coordinates
-	out vec4 fragmentColor;		// output that goes to the raster memory as told by glBindFragDataLocation
+	in  vec2 texcoord;
+	out vec4 fragmentColor;
 
 	void main() {
 		fragmentColor = texture(textureUnit, texcoord);
@@ -327,11 +327,39 @@ private:
         return bestHit;
     }
 
+    Hit firstIntersectP(Ray ray) {
+        Hit bestHit;
+        for (Intersectable * object : objects) {
+            Hit hit = object->intersect(ray);
+            if (hit.t > 0 && (bestHit.t < 0 || hit.t < bestHit.t)) {
+                bestHit = hit;
+            }
+        }
+        if (dot(ray.dir, bestHit.normal) > 0) bestHit.normal = bestHit.normal * (-1);
+        return bestHit;
+    }
+
+    bool shadowIntersect(Ray ray, int id) {
+        Hit hit = firstIntersectP(ray);
+        if (id == 1 && hit.t > 0 && length(hit.position - ray.start) + 0.001f < length(vec3(0.0f, 0.5f, 0.0f) - ray.start)) return true;
+        if (id == 2 && hit.t > 0 && length(hit.position - ray.start) + 0.001f < length(vec3(0.3f, 0.4f, -0.5f) - ray.start)) return true;
+        if (id == 3 && hit.t > 0 && length(hit.position - ray.start) + 0.001f < length(vec3(-0.5f, 0.0f, 0.0f) - ray.start)) return true;
+        return false;
+    }
+
     vec3 trace(Ray ray) {
         Hit hit = firstIntersect(ray);
         if (hit.t < 0) return La;
         float c = 0.2f * (1.0f + dot(normalize(hit.normal), normalize(-ray.dir)));
         vec3 outRadiance = vec3(c, c, c);
+        if (!shadowIntersect(Ray(hit.position + hit.normal * 0.0002f, normalize(vec3(0.0f, 0.5f, 0.0f) + vec3(0, -1, 0) * 0.002f - hit.position)), 1))
+            outRadiance.x += 0.2f;
+
+        if (!shadowIntersect(Ray(hit.position + hit.normal * 0.0002f, normalize(vec3(0.3f, 0.4f, -0.5f) + vec3(0, 0, 1) * 0.002f - hit.position)), 2))
+            outRadiance.y += 0.2f;
+
+        if (!shadowIntersect(Ray(hit.position + hit.normal * 0.0002f, normalize(vec3(-0.5f, 0.0f, 0.0f) + vec3(1, 0, 0) * 0.002f - hit.position)), 3))
+            outRadiance.z += 0.2f;
         return outRadiance;
     }
 };
